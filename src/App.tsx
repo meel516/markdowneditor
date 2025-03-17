@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
@@ -6,55 +6,32 @@ import { Split, FileEdit, Eye, Github, Server } from 'lucide-react';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown as markdownLang } from '@codemirror/lang-markdown';
 
-const initialMarkdown = `# Welcome to the Markdown Editor!
-
-## Features:
-- Real-time preview
-- GitHub Flavored Markdown support
-- Syntax highlighting
-- Backend processing
-- Clean and modern interface
-- Split view layout
-
-### Try it out:
-1. Write your markdown on the left
-2. See the preview on the right
-3. Toggle between client/server processing
-4. Enjoy the seamless experience!
-
-#### Code Example:
-\`\`\`javascript
-function greeting(name) {
-  return \`Hello, \${name}!\`;
-}
-\`\`\`
-
-#### Table Example:
-| Feature | Status |
-|---------|--------|
-| Preview | ✅ |
-| GFM | ✅ |
-| Tables | ✅ |
-
-> This is a blockquote. You can use it to highlight important information.
-
-![Sample Image](https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=600&auto=format&fit=crop&q=80)
-`;
+const DEBOUNCE_DELAY = 500; 
 
 function App() {
-  const [markdown, setMarkdown] = useState(initialMarkdown);
+  const [markdown, setMarkdown] = useState('');
   const [useServer, setUseServer] = useState(false);
   const [serverHtml, setServerHtml] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [debouncedMarkdown, setDebouncedMarkdown] = useState('');
 
+  useEffect(() => {
+    if (useServer) {
+      const timer = setTimeout(() => {
+        setDebouncedMarkdown(markdown);
+      }, DEBOUNCE_DELAY);
+
+      return () => clearTimeout(timer);
+    }
+  }, [markdown, useServer]);
+
+  // Function to process markdown on the server
   const processMarkdownOnServer = useCallback(async (text: string) => {
     try {
       setIsLoading(true);
       const response = await fetch('http://localhost:3000/api/convert', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ markdown: text }),
       });
       const data = await response.json();
@@ -66,16 +43,21 @@ function App() {
     }
   }, []);
 
+
+  useEffect(() => {
+    if (useServer && debouncedMarkdown) {
+      processMarkdownOnServer(debouncedMarkdown);
+    }
+  }, [debouncedMarkdown, useServer, processMarkdownOnServer]);
+
+
   const handleMarkdownChange = useCallback((value: string) => {
     setMarkdown(value);
-    if (useServer) {
-      processMarkdownOnServer(value);
-    }
-  }, [useServer, processMarkdownOnServer]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+ 
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
@@ -96,7 +78,7 @@ function App() {
                 <span>{useServer ? 'Server Processing' : 'Client Processing'}</span>
               </button>
               <a
-                href="https://github.com"
+                href="https://github.com/meel516"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-500 hover:text-gray-700"
@@ -108,10 +90,10 @@ function App() {
         </div>
       </header>
 
-      {/* Main Content */}
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Editor Section */}
+
           <div className="bg-white rounded-lg shadow-sm">
             <div className="p-4 border-b border-gray-200">
               <div className="flex items-center space-x-2">
@@ -131,7 +113,6 @@ function App() {
             </div>
           </div>
 
-          {/* Preview Section */}
           <div className="bg-white rounded-lg shadow-sm">
             <div className="p-4 border-b border-gray-200">
               <div className="flex items-center justify-between">
@@ -139,9 +120,7 @@ function App() {
                   <Eye className="h-5 w-5 text-gray-500" />
                   <h2 className="text-lg font-medium text-gray-900">Preview</h2>
                 </div>
-                {isLoading && (
-                  <div className="text-sm text-gray-500">Processing...</div>
-                )}
+                {isLoading && <div className="text-sm text-gray-500">Processing...</div>}
               </div>
             </div>
             <div className="prose max-w-none p-4 h-[calc(100vh-16rem)] overflow-auto">
